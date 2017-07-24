@@ -63,4 +63,3 @@ WRAPPER_UUID = '@uuid'
 WRAPPER_EVENT_TYPE = 'event_type'
 WRAPPER_MESSAGE = 'message'
 WRAPPER_REPORT_TIME = 'report_time'
-
