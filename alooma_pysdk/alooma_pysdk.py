@@ -2,10 +2,6 @@
 # This module contains the Alooma Python SDK, used to report events to the
 # Alooma server
 from __future__ import absolute_import
-try:
-    import queue
-except ImportError:
-    import Queue as queue
 
 import datetime
 import decimal
@@ -161,7 +157,7 @@ class PythonSDK:
         if not callable(self._callback):
             errors.append(consts.LOG_MSG_BAD_PARAM_CALLBACK %
                           str(self._callback))
-        if not isinstance(servers, (str, py2to3.unicode)) and \
+        if not isinstance(servers, py2to3.basestring) and \
                 not isinstance(servers, list):
             errors.append(consts.LOG_MSG_BAD_PARAM_SERVERS % servers)
         if event_type and not isinstance(event_type, py2to3.basestring) \
@@ -357,7 +353,7 @@ class _Sender:
         self._session = requests.Session()
 
         # Set connection vars
-        if isinstance(hosts, str) or isinstance(hosts, py2to3.unicode):
+        if isinstance(hosts, py2to3.basestring):
             hosts = hosts.strip().split(',')
         self._hosts = hosts
         self._use_ssl = use_ssl
