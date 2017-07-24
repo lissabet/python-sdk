@@ -165,7 +165,7 @@ class PythonSDK:
                 not isinstance(servers, list):
             errors.append(consts.LOG_MSG_BAD_PARAM_SERVERS % servers)
         if event_type and not isinstance(event_type, py2to3.basestring) \
-            and not callable(event_type):
+                and not callable(event_type):
             et_type = type(event_type)
             errors.append(consts.LOG_MSG_BAD_PARAM_EVENT_TYPE %
                           (event_type, et_type))
@@ -501,7 +501,8 @@ class _Sender:
     def _is_batch_full(self, batch, batch_members_len):
         # actual size = parentheses + `,` per event + combined len of all events
         actual_size = 2 + (len(batch) - 1) + batch_members_len
-        return int(actual_size) >= int(self._batch_max_size - consts.BATCH_SIZE_MARGIN)
+        return int(actual_size) >= int(self._batch_max_size -
+                                       consts.BATCH_SIZE_MARGIN)
 
     def _get_batch(self, last_batch_time):
         batch = []
