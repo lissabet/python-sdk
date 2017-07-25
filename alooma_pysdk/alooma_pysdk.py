@@ -497,7 +497,8 @@ class _Sender:
     def _is_batch_full(self, batch, batch_members_len):
         # actual size = parentheses + `,` per event + combined len of all events
         actual_size = 2 + (len(batch) - 1) + batch_members_len
-        return actual_size >= self._batch_max_size - consts.BATCH_SIZE_MARGIN
+        return int(actual_size) >= (self._batch_max_size -
+                                    consts.BATCH_SIZE_MARGIN)
 
     def _get_batch(self, last_batch_time):
         batch = []
