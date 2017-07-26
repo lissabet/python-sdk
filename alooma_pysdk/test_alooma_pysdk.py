@@ -1,5 +1,4 @@
 from __future__ import absolute_import
-import six
 import datetime
 import json
 import logging
@@ -8,10 +7,7 @@ from unittest import TestCase
 import decimal
 import requests
 
-if six.PY2:
-    from mock import patch, Mock
-else:
-    from unittest.mock import patch, Mock
+from mock import patch, Mock
 
 from nose.plugins.attrib import attr
 from nose.tools import assert_equal, assert_true, assert_false, \
@@ -283,25 +279,23 @@ class TestSender(TestCase):
     @patch.object(requests, 'Session')
     @raises(exceptions.ConnectionFailed)
     def test_verify_connection(self, session_mock, start_sender_mock):
+        set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, 'asd', Mock())
-        # sender._notify = Mock()
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         sender._verify_connection()
-
 
     @patch.object(apysdk._Sender, '_start_sender_thread')
     @patch.object(requests, 'Session')
     @raises(exceptions.BadToken)
     def test_verify_token(self, session_mock, start_sender_mock):
+        set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, 'asd', Mock())
-        # sender._notify = Mock()
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         sender._verify_token()
-
 
     @attr('slow')
     @patch.object(apysdk._Sender, '_start_sender_thread')
@@ -356,6 +350,7 @@ class TestSender(TestCase):
 
     @patch.object(requests, 'Session')
     def test_send_batch(self, session_mock):
+        set_session_get_json_return_value(session_mock)
         notify_mock = Mock()
         sender = apysdk._Sender('mockHost', 1234, 10, 100, 100, True,
                                 notify_mock)
@@ -419,3 +414,7 @@ def test_terminate():
         assert_equal(1, sender_mock.close.call_count)
 
     assert_equal(0, len(apysdk._sender_instances))
+
+
+def set_session_get_json_return_value(session_mock):
+    session_mock().get().json = Mock(return_value=dict())
