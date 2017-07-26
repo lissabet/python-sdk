@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 import json
 import logging
@@ -5,15 +6,16 @@ from unittest import TestCase
 
 import decimal
 import requests
+
 from mock import patch, Mock
+
 from nose.plugins.attrib import attr
 from nose.tools import assert_equal, assert_true, assert_false, \
-    assert_is_none, assert_is_not_none, assert_not_equal, assert_in, raises, \
-    assert_raises
+    assert_is_not_none, assert_not_equal, assert_in, raises, assert_raises
 
-import alooma_pysdk as apysdk
-import consts
-import pysdk_exceptions as exceptions
+from . import alooma_pysdk as apysdk
+from . import consts, py2to3
+from . import pysdk_exceptions as exceptions
 
 STRING_EVENT_REPORTED = 'reported_event'
 ALL_WRAPPER_FIELDS = [getattr(consts, f) for f in consts.__dict__
@@ -67,7 +69,8 @@ class TestPythonSDK(TestCase):
                                     consts.DEFAULT_BUFFER_SIZE,
                                     consts.DEFAULT_BATCH_INTERVAL,
                                     consts.DEFAULT_BATCH_SIZE, True)),
-                     (passed_to_sender[1].values()[0], passed_to_sender[0]))
+                     (next(v for v in passed_to_sender[1].values()),
+                      passed_to_sender[0]))
 
         # Test and ensure event type setting works
         custom_et = 'custom'
@@ -141,7 +144,7 @@ class TestPythonSDK(TestCase):
         sdk = self._get_python_sdk(event_type=lambda e: e['type'])
         formatted = sdk._format_event(event)
         decoded = json.loads(formatted)
-        assert_true(isinstance(formatted, basestring))  # Assert encoded JSON
+        assert_true(isinstance(formatted, py2to3.basestring))  # Assert encoded JSON
         for field in ALL_WRAPPER_FIELDS:
             assert_true(field in decoded, field)  # Are all fields in wrapper?
         # Assert message is correctly inserted to wrapper
@@ -276,25 +279,23 @@ class TestSender(TestCase):
     @patch.object(requests, 'Session')
     @raises(exceptions.ConnectionFailed)
     def test_verify_connection(self, session_mock, start_sender_mock):
+        set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, 'asd', True)
-        sender._notify = Mock()
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         sender._verify_connection()
-
 
     @patch.object(apysdk._Sender, '_start_sender_thread')
     @patch.object(requests, 'Session')
     @raises(exceptions.BadToken)
     def test_verify_token(self, session_mock, start_sender_mock):
+        set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, 'asd', True)
-        sender._notify = Mock()
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         sender._verify_token()
-
 
     @attr('slow')
     @patch.object(apysdk._Sender, '_start_sender_thread')
@@ -349,6 +350,7 @@ class TestSender(TestCase):
 
     @patch.object(requests, 'Session')
     def test_send_batch(self, session_mock):
+        set_session_get_json_return_value(session_mock)
         notify_mock = Mock()
         sender = apysdk._Sender('mockHost', 1234, 10, 100, 100, True,
                                 notify_mock)
@@ -412,3 +414,7 @@ def test_terminate():
         assert_equal(1, sender_mock.close.call_count)
 
     assert_equal(0, len(apysdk._sender_instances))
+
+
+def set_session_get_json_return_value(session_mock):
+    session_mock().get().json = Mock(return_value=dict())

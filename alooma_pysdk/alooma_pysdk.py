@@ -1,7 +1,8 @@
 # -*- coding: utf8 -*-
 # This module contains the Alooma Python SDK, used to report events to the
 # Alooma server
-import Queue
+from __future__ import absolute_import
+
 import datetime
 import decimal
 import inspect
@@ -13,6 +14,7 @@ import threading
 import time
 import uuid
 
+
 try:
     from OpenSSL.SSL import SysCallError
 
@@ -20,8 +22,7 @@ try:
 except ImportError:
     broken_pipe_errors = (requests.exceptions.ConnectionError,)
 
-import consts
-import pysdk_exceptions as exceptions
+from . import consts, pysdk_exceptions as exceptions, py2to3
 
 
 #####################################################
@@ -48,7 +49,7 @@ def __get_logger():
             '%(asctime)s [%(levelname)s] {}: %(message)s'.format(__name__),
             '%Y-%m-%dT%H:%M:%S')
         logger.propagate = 0
-        logger.warn('Using the default logger configuration')
+        logger.warning('Using the default logger configuration')
     return logger
 
 
@@ -149,21 +150,21 @@ class PythonSDK:
 
         # Check inputs.
         errors = []
-        if token is not None and not isinstance(token, basestring):
+        if token is not None and not isinstance(token, py2to3.basestring):
             errors.append(consts.LOG_MSG_BAD_PARAM_TOKEN % token)
         if not isinstance(buffer_size, int) or buffer_size < 0:
             errors.append(consts.LOG_MSG_BAD_PARAM_BUFFER_SIZE % buffer_size)
         if not callable(self._callback):
             errors.append(consts.LOG_MSG_BAD_PARAM_CALLBACK %
                           str(self._callback))
-        if not isinstance(servers, (str, unicode)) and not isinstance(servers,
-                                                                      list):
+        if not isinstance(servers, py2to3.basestring) and \
+                not isinstance(servers, list):
             errors.append(consts.LOG_MSG_BAD_PARAM_SERVERS % servers)
-        if event_type and not isinstance(event_type, basestring) \
-            and not callable(event_type):
+        if event_type and not isinstance(event_type, py2to3.basestring) \
+                and not callable(event_type):
             et_type = type(event_type)
-            errors.append(consts.LOG_MSG_BAD_PARAM_EVENT_TYPE % (event_type,
-                                                                 et_type))
+            errors.append(consts.LOG_MSG_BAD_PARAM_EVENT_TYPE %
+                          (event_type, et_type))
         if not isinstance(batch_size, int):
             errors.append(consts.LOG_MSG_BAD_PARAM_BATCH_SIZE % batch_size)
         if not isinstance(batch_interval, (int, float)):
@@ -259,7 +260,7 @@ class PythonSDK:
             return False
 
         # Send the event to the queue if it is a dict or a string.
-        if isinstance(event, (dict, basestring)):
+        if isinstance(event, (dict, ) + py2to3.basestring):
             formatted_event = self._format_event(event, metadata)
 
             should_block = block if block is not None else self.is_blocking
@@ -346,13 +347,13 @@ class _Sender:
     def __init__(self, hosts, token, buffer_size, batch_interval, batch_size,
                  use_ssl, notify):
         # This is a concurrent FIFO queue
-        self._event_queue = Queue.Queue(buffer_size)
+        self._event_queue = py2to3.queue.Queue(buffer_size)
 
         # The session on which requests will be sent
         self._session = requests.Session()
 
         # Set connection vars
-        if isinstance(hosts, str) or isinstance(hosts, unicode):
+        if isinstance(hosts, py2to3.basestring):
             hosts = hosts.strip().split(',')
         self._hosts = hosts
         self._use_ssl = use_ssl
@@ -517,7 +518,7 @@ class _Sender:
                     batch.append(event)
                     curr_batch_len += event_size
 
-        except Queue.Empty:  # No more events to fetch
+        except py2to3.queue.Empty:  # No more events to fetch
             pass
 
         if not batch:
@@ -552,7 +553,7 @@ class _Sender:
                 time.sleep(consts.EMPTY_BATCH_SLEEP_TIME)
 
             except exceptions.SendFailed as ex:  # Failed to send an event batch
-                self._notify(ex.severity, ex.message)
+                self._notify(ex.severity, str(ex))
                 self._is_connected.clear()
 
                 if batch:  # Failed after pulling a batch from the queue
@@ -581,7 +582,7 @@ class _Sender:
                 self._notify(logging.WARNING, consts.LOG_MSG_BUFFER_FREED)
                 self._notified_buffer_full = False
 
-        except Queue.Full:
+        except py2to3.queue.Full:
             if block:  # Blocking - should block until space is freed
                 self._event_queue.put(event)
 
@@ -673,6 +674,6 @@ def terminate():
     underlying sockets
     """
     with _sender_instances_lock:
-        for sender_key, sender in _sender_instances.iteritems():
+        for sender_key, sender in _sender_instances.items():
             sender.close()
         _sender_instances.clear()
