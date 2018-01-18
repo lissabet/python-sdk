@@ -49,7 +49,7 @@ def __get_logger():
             '%(asctime)s [%(levelname)s] {}: %(message)s'.format(__name__),
             '%Y-%m-%dT%H:%M:%S')
         logger.propagate = 0
-        logger.warning('Using the default logger configuration')
+        logger.info('Using the default logger configuration')
     return logger
 
 
