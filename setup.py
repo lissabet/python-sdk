@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from distutils.core import setup
-from pip.req import parse_requirements
+try:
+    from pip.req import parse_requirements
+except ImportError:
+    from pip._internal.req import parse_requirements
 
 install_reqs = parse_requirements("requirements.txt", session=False)
 
@@ -12,7 +15,7 @@ setup(
     name=sdk_package_name,
     packages=[sdk_package_name],
     package_data={sdk_package_name: ['alooma_ca']},
-    version='2.0.1.3',
+    version='2.0.1.4',
     description='An easy-to-integrate SDK for your Python apps to report '
                 'events to Alooma',
     url='https://github.com/Aloomaio/python-sdk',
