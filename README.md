@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/Aloomaio/python-sdk.svg?branch=master)](https://travis-ci.org/Aloomaio/python-sdk) [![codecov](https://codecov.io/gh/aloomaio/python-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/aloomaio/python-sdk)
+
+
 **Overview**
 ---------
 The 'Python SDK' module (hereafter: **The PySDK**) provides a lightweight, efficient, reliable input point to Alooma. The module provides a library of methods to record events and report them to Alooma from any Python application.
