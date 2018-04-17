@@ -5,8 +5,8 @@ python:
 - 3.5
 - 3.6
 # PyPy versions
-- "pypy2.7"
-- "pypy3.5"
+- pypy
+- pypy3
 before_install:
 - travis_retry pip install --upgrade pip setuptools  # Upgrade pip and setuptools to get ones with `wheel` support
 install:
