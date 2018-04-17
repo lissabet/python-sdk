@@ -12,7 +12,7 @@ before_install:
 install:
 - travis_retry pip install pytest pytest-cov codecov
 script:
-- pytest -v --cov=.
+- pytest -v --cov=alooma_pysdk
 after_success:
   - codecov
 sudo: false
