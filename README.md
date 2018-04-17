@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.org/Aloomaio/python-sdk.svg?branch=master)](https://travis-ci.org/Aloomaio/python-sdk) 
+[![Build Status](https://travis-ci.org/Aloomaio/python-sdk.svg?branch=master)](https://travis-ci.org/Aloomaio/python-sdk) [![codecov](https://codecov.io/gh/aloomaio/python-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/aloomaio/python-sdk)
+
 
 **Overview**
 ---------
