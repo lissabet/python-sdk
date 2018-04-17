@@ -15,6 +15,7 @@ LOG_MSG_CALLBACK_FAILURE = 'Failure in callback function call: %s'
 LOG_MSG_BATCH_TOO_BIG = 'Remote server closed the socket mid-send, batch size' \
                         'will be re-adjusted. Original Exception: %s'
 
+LOG_MSG_BAD_PARAM_SEND_FRAME = '"send_frame" must be a boolean. Recieved "%s"'
 LOG_MSG_BAD_PARAM_TOKEN = 'Invalid token (%s). Must be a string'
 LOG_MSG_BAD_PARAM_BUFFER_SIZE = 'Invalid buffer size: %s'
 LOG_MSG_BAD_PARAM_EVENT_TYPE = 'Invalid event_type (%s). Must be either a ' \

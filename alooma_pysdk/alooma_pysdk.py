@@ -100,7 +100,7 @@ class PythonSDK:
                  buffer_size=consts.DEFAULT_BUFFER_SIZE, blocking=False,
                  batch_interval=consts.DEFAULT_BATCH_INTERVAL,
                  batch_size=consts.DEFAULT_BATCH_SIZE, use_ssl=True,
-                 *args, **kwargs):
+                 send_frame=True, *args, **kwargs):
         """
         Initializes the Alooma Python SDK, creating a connection to
         the Alooma server
@@ -132,6 +132,9 @@ class PythonSDK:
         :param use_ssl:        (Optional) If True, the SDK will attempt to use
                                an HTTPS connection. Else, a simple HTTP
                                connection will be used. Default is `True`
+        :param send_frame:     (Optional) If True, the SDK sends the file and
+                               line number from which an event is reported.
+                               Defaults to True.
         """
         _logger.debug('init. locals=%s' % locals())
 
@@ -157,6 +160,8 @@ class PythonSDK:
         if not callable(self._callback):
             errors.append(consts.LOG_MSG_BAD_PARAM_CALLBACK %
                           str(self._callback))
+        if not isinstance(send_frame, bool):
+            errors.append(consts.LOG_MSG_BAD_PARAM_SEND_FRAME % send_frame)
         if not isinstance(servers, py2to3.basestring) and \
                 not isinstance(servers, list):
             errors.append(consts.LOG_MSG_BAD_PARAM_SERVERS % servers)
@@ -187,7 +192,7 @@ class PythonSDK:
         sender_params = (servers, token, buffer_size, batch_interval,
                          batch_size, use_ssl)
         self._sender = _get_sender(*sender_params, notify_func=self._notify)
-
+        self.send_frame = send_frame
         self.token = token
 
         if callable(event_type):
@@ -215,11 +220,12 @@ class PythonSDK:
         event_wrapper[consts.WRAPPER_REPORT_TIME] = timestamp
 
         # Add the enclosing frame
-        frame = inspect.currentframe().f_back.f_back
-        filename = frame.f_code.co_filename
-        line_number = frame.f_lineno
-        event_wrapper[consts.WRAPPER_CALLING_FILE] = str(filename)
-        event_wrapper[consts.WRAPPER_CALLING_LINE] = str(line_number)
+        if self.send_frame:
+            frame = inspect.currentframe().f_back.f_back
+            filename = frame.f_code.co_filename
+            line_number = frame.f_lineno
+            event_wrapper[consts.WRAPPER_CALLING_FILE] = str(filename)
+            event_wrapper[consts.WRAPPER_CALLING_LINE] = str(line_number)
 
         # Add the UUID to the event
         event_wrapper[consts.WRAPPER_UUID] = str(uuid.uuid4())
@@ -228,6 +234,7 @@ class PythonSDK:
         try:
             event_wrapper[consts.WRAPPER_EVENT_TYPE] = \
                 self._get_event_type(orig_event)
+
         except Exception:
             pass  # The event type will be the input name, added by Alooma
 
