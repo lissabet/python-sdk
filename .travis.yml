@@ -10,7 +10,7 @@ python:
 before_install:
 - travis_retry pip install --upgrade pip setuptools  # Upgrade pip and setuptools to get ones with `wheel` support
 install:
-- travis_retry pip install pytest codecov
+- travis_retry pip install pytest pytest-cov codecov
 script:
 - pytest -v --cov=.
 after_success:
