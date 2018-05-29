@@ -6,6 +6,7 @@ from unittest import TestCase
 
 import decimal
 import requests
+import time
 
 from mock import patch, Mock
 
@@ -13,9 +14,9 @@ from nose.plugins.attrib import attr
 from nose.tools import assert_equal, assert_true, assert_false, \
     assert_is_not_none, assert_not_equal, assert_in, raises, assert_raises
 
-from . import alooma_pysdk as apysdk
-from . import consts, py2to3
-from . import pysdk_exceptions as exceptions
+from alooma_pysdk import alooma_pysdk as apysdk
+from alooma_pysdk import consts, py2to3
+from alooma_pysdk import pysdk_exceptions as exceptions
 
 STRING_EVENT_REPORTED = 'reported_event'
 ALL_WRAPPER_FIELDS = [getattr(consts, f) for f in consts.__dict__
@@ -310,7 +311,7 @@ class TestSender(TestCase):
                                 True, notify_mock)
 
         # Assert empty queue raises EmptyBatch
-        last_batch_time = datetime.datetime.utcnow()
+        last_batch_time = time.time()
         raised = False
         try:
             sender._get_batch(last_batch_time)
@@ -334,13 +335,12 @@ class TestSender(TestCase):
                 json.dumps({'num': i, 'some_field': 'some_val'}))
 
         # Assert we comply with the max batch size (ignore last event)
-        last_batch_time = datetime.datetime.utcnow()
+        last_batch_time = time.time()
         batch = sender._get_batch(last_batch_time)
         assert_true(len(''.join(batch)) < sender._batch_max_size)
 
         # Assert we comply with the max batch interval
-        last_batch_time = datetime.datetime.utcnow() - datetime.timedelta(
-            seconds=sender._batch_max_interval)
+        last_batch_time = time.time() - sender._batch_max_interval
         try:
             raised_empty_batch = False
             sender._get_batch(last_batch_time)

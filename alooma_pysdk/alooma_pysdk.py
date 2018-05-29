@@ -133,7 +133,7 @@ class PythonSDK:
                                an HTTPS connection. Else, a simple HTTP
                                connection will be used. Default is `True`
         """
-        _logger.debug('init. locals=%s' % locals())
+        _logger.debug('init. locals=%s', locals())
 
         if args or kwargs:
             _logger.warning('The SDK received unrecognized arguments which '
@@ -228,7 +228,11 @@ class PythonSDK:
         try:
             event_wrapper[consts.WRAPPER_EVENT_TYPE] = \
                 self._get_event_type(orig_event)
-        except Exception:
+
+        except Exception as ex:
+            _logger.warning('Failed to extract an event type from an event - '
+                            'please check your get_event_type function. The '
+                            'original event was: %s', orig_event)
             pass  # The event type will be the input name, added by Alooma
 
         # Optionally add external metadata
@@ -266,10 +270,10 @@ class PythonSDK:
             should_block = block if block is not None else self.is_blocking
             return self._sender.enqueue_event(formatted_event, should_block)
 
-        else:  # Event is not a dict nor a string. Deny it.
-            error_message = (consts.LOG_MSG_BAD_EVENT % (type(event), event))
-            self._notify(logging.ERROR, error_message)
-            return False
+        # Event is not a dict nor a string. Deny it.
+        error_message = (consts.LOG_MSG_BAD_EVENT % (type(event), event))
+        self._notify(logging.ERROR, error_message)
+        return False
 
     def report_many(self, event_list, metadata=None, block=None):
         """
@@ -306,7 +310,7 @@ class PythonSDK:
         try:
             self._callback(log_level, message, timestamp)
         except Exception as ex:
-            _logger.warning(consts.LOG_MSG_CALLBACK_FAILURE % str(ex))
+            _logger.warning(consts.LOG_MSG_CALLBACK_FAILURE, str(ex))
 
     @staticmethod
     def _default_callback(msg_type, message, timestamp):
@@ -491,8 +495,8 @@ class _Sender:
             raise exceptions.SendFailed(str(ex))
 
     def _is_batch_time_over(self, last_batch_time):
-        batch_time = (datetime.datetime.utcnow() - last_batch_time)
-        return batch_time.total_seconds() > self._batch_max_interval
+        batch_time = (time.time() - last_batch_time)
+        return batch_time > self._batch_max_interval
 
     def _is_batch_full(self, batch, batch_members_len):
         # actual size = parentheses + `,` per event + combined len of all events
@@ -534,7 +538,7 @@ class _Sender:
         """
         if not self._http_host:
             self._choose_host()
-        last_batch_time = datetime.datetime.utcnow()
+        last_batch_time = time.time()
 
         while not (self._is_terminated.isSet() and self._event_queue.empty()):
             batch = None
@@ -543,6 +547,10 @@ class _Sender:
                     self._verify_connection()
 
                 batch = self._get_batch(last_batch_time)
+                while (time.time() - last_batch_time <
+                       consts.DEFAULT_MIN_BATCH_INTERVAL):
+                    time.sleep(0.1)
+
                 self._send_batch(batch)
 
             except exceptions.ConnectionFailed:  # Failed to connect to server
@@ -565,7 +573,7 @@ class _Sender:
                 self._is_connected.set()
 
             finally:  # Advance last batch time
-                last_batch_time = datetime.datetime.utcnow()
+                last_batch_time = time.time()
 
     def enqueue_event(self, event, block):
         """
