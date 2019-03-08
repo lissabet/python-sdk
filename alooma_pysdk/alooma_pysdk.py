@@ -494,7 +494,6 @@ class _Sender(object):
             while not self._is_batch_time_over(last_batch_time) \
                     and not self._is_batch_full(batch, curr_batch_len):
                 event = self.__get_event()
-                print 'GOT %s' % event
                 event_size = len(event)
 
                 # On the rare case that the last event makes the batch too big,
