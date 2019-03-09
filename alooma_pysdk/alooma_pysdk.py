@@ -324,7 +324,7 @@ class _Sender(object):
     """
 
     def __init__(self, hosts, token, buffer_size, batch_interval, batch_size,
-                 use_ssl, notify, sender_process=True):
+                 use_ssl, sender_process, notify):
         # The session on which requests will be sent
         self._session = requests.Session()
 
@@ -347,9 +347,10 @@ class _Sender(object):
         self._exceeding_event = None
 
         if sender_process:
-            self._is_connected = multiprocessing.Event()
-            self._is_terminated = multiprocessing.Event()
-            self._event_queue = multiprocessing.Queue(buffer_size)
+            manager = multiprocessing.Manager()
+            self._is_connected = manager.Event()
+            self._is_terminated = manager.Event()
+            self._event_queue = manager.Queue(buffer_size)
         else:
             self._is_connected = threading.Event()
             self._is_terminated = threading.Event()

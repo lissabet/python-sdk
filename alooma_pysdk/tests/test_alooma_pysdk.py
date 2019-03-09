@@ -176,11 +176,11 @@ class TestSender(TestCase):
         # Test that event is enqueued properly
         notify_mock = Mock()
         sender = apysdk._Sender('mockHost', 1234, 1, 10, 10,
-                                True, notify_mock)
+                                True, False, notify_mock)
         some_event = {'event': 1}
         ret = sender.enqueue_event(some_event, False)
         assert ret
-        assert sender._event_queue.get(timeout=3) == some_event
+        assert sender._event_queue.get_nowait() == some_event
 
         # Test failing with notification when buffer is full
         sender.enqueue_event(some_event, False)
@@ -190,7 +190,7 @@ class TestSender(TestCase):
         assert sender._notified_buffer_full
 
         # Test recovering when buffer frees up
-        sender._event_queue.get(timeout=3)
+        sender._event_queue.get_nowait()
         assert sender.enqueue_event(some_event, False)
         assert notify_mock.call_args[0] == \
                (logging.WARNING, consts.LOG_MSG_BUFFER_FREED)
@@ -203,7 +203,7 @@ class TestSender(TestCase):
         notify_mock = Mock()
         batch_size = 25
         sender = apysdk._Sender('mockHost', 1234, 2, 10, batch_size, True,
-                                notify_mock)
+                                False, notify_mock)
         event = {'rofl': 'lol'}
         event_str = apysdk._json_enc.encode(event)
         sender._event_queue.put(event_str)
@@ -241,7 +241,7 @@ class TestSender(TestCase):
         # Test when only one host exists and it's the first time
         host = 'mockHost'
         sender = apysdk._Sender(host, 1234, buffer_size, 100, 100,
-                                True, notify_mock)
+                                True, False, notify_mock)
 
         sender._choose_host()
         assert host == sender._http_host
@@ -253,7 +253,7 @@ class TestSender(TestCase):
         # Test when there are multiple hosts
         hosts = ['1', '2', '3', '4', '5', '6']
         sender = apysdk._Sender(hosts, 1234, buffer_size, 100, 100,
-                                True, notify_mock)
+                                True, False, notify_mock)
         sender._choose_host()
         assert sender._http_host is not None
 
@@ -273,7 +273,7 @@ class TestSender(TestCase):
     def test_verify_connection(self, session_mock, *_):
         set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, False, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         with pytest.raises(exceptions.ConnectionFailed):
@@ -284,7 +284,7 @@ class TestSender(TestCase):
     def test_verify_token(self, session_mock, start_sender_mock):
         set_session_get_json_return_value(session_mock)
         # Assert the function throws the right exception when it fails
-        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, Mock())
+        sender = apysdk._Sender('12', 1234, 10, 100, 100, True, False, Mock())
         sender._connection_validation_url = 'asd'
         sender._session.get.return_value = Mock(ok=False)
         with pytest.raises(exceptions.BadToken):
@@ -298,7 +298,7 @@ class TestSender(TestCase):
         notify_mock = Mock()
         buffer_size = 1000
         sender = apysdk._Sender('mockHost', 1234, buffer_size, 100, 100,
-                                True, notify_mock)
+                                True, False, notify_mock)
 
         # Assert empty queue raises EmptyBatch
         last_batch_time = datetime.datetime.utcnow()
@@ -316,7 +316,7 @@ class TestSender(TestCase):
         notify_mock = Mock()
         buffer_size = 1000
         sender = apysdk._Sender('mockHost', 1234, buffer_size, 100, 100,
-                                True, notify_mock)
+                                True, False, notify_mock)
 
         # Populate the queue
         for i in range(buffer_size):
@@ -342,7 +342,7 @@ class TestSender(TestCase):
     def test_send_batch(self, session_mock):
         set_session_get_json_return_value(session_mock)
         notify_mock = Mock()
-        sender = apysdk._Sender('mockHost', 1234, 10, 100, 100, True,
+        sender = apysdk._Sender('mockHost', 1234, 10, 100, 100, True, False,
                                 notify_mock)
         encode = apysdk._json_enc.encode
         batch = [encode({"event": 1}), encode({"event": 2})]
