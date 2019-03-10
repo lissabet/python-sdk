@@ -79,7 +79,7 @@ class PythonSDK(object):
                  buffer_size=consts.DEFAULT_BUFFER_SIZE, blocking=False,
                  batch_interval=consts.DEFAULT_BATCH_INTERVAL,
                  batch_size=consts.DEFAULT_BATCH_SIZE, use_ssl=True,
-                 sender_process=True, *args, **kwargs):
+                 sender_process=False, *args, **kwargs):
         """
         Initializes the Alooma Python SDK, creating a connection to
         the Alooma server
@@ -111,6 +111,8 @@ class PythonSDK(object):
         :param use_ssl:        (Optional) If True, the SDK will attempt to use
                                an HTTPS connection. Else, a simple HTTP
                                connection will be used. Default is `True`
+        :param sender_process: If True, the sender routine is run on a
+                               subprocess instead of a thread
         """
         logger.debug('init. locals=%s' % locals())
 
