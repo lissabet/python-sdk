@@ -3,6 +3,7 @@
 # Alooma server
 import datetime
 import decimal
+import functools
 import inspect
 import json
 import logging
@@ -37,25 +38,21 @@ if logger.level == logging.NOTSET:
     logger.setLevel(logging.WARNING)
 
 
-# Declare and instantiate an AloomaEncoder
-# This encoder allows JSON encoding of additional types
-class AloomaEncoder(json.JSONEncoder):
-    """
-    Support datetime and decimal encoding when serializing JSONs
-    """
-
-    def default(self, obj):
-        if isinstance(obj, (datetime.datetime, datetime.date)):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.timedelta):
-            return (datetime.datetime.min + obj).time().isoformat()
-        elif isinstance(obj, decimal.Decimal):
-            return str(obj)
-        else:
-            return super(AloomaEncoder, self).default(obj)
+# Support some additional common Python types
+def _support_additional_types(obj):
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    elif isinstance(obj, datetime.timedelta):
+        return (datetime.datetime.min + obj).time().isoformat()
+    elif isinstance(obj, decimal.Decimal):
+        return str(obj)
+    raise TypeError('Unsupported JSON type: "%s" (%s)' % (obj, type(obj)))
 
 
-_json_enc = AloomaEncoder(separators=(',', ':'))
+json_dumps = functools.partial(
+    json.dumps, separators=(',', ':'),
+    default=_support_additional_types
+)
 
 
 class PythonSDK(object):
@@ -219,7 +216,7 @@ class PythonSDK(object):
         # Wrap the event with metadata
         event_wrapper[consts.WRAPPER_MESSAGE] = orig_event
 
-        return _json_enc.encode(event_wrapper)
+        return json_dumps(event_wrapper)
 
     def report(self, event, metadata=None, block=None):
         """

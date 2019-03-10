@@ -205,7 +205,7 @@ class TestSender(TestCase):
         sender = apysdk._Sender('mockHost', 1234, 2, 10, batch_size, True,
                                 False, notify_mock)
         event = {'rofl': 'lol'}
-        event_str = apysdk._json_enc.encode(event)
+        event_str = apysdk.json_dumps(event)
         sender._event_queue.put(event_str)
         sender._exceeding_event = None
         assert event_str == sender._Sender__get_event()
@@ -213,14 +213,14 @@ class TestSender(TestCase):
         # Assert exceeding event is dequeued first and events aren't lost
         exceeding_event = {'lmao': 'trololol'}
         sender._event_queue.put(event_str)
-        exceeding_event_str = apysdk._json_enc.encode(exceeding_event)
+        exceeding_event_str = apysdk.json_dumps(exceeding_event)
         sender._exceeding_event = exceeding_event_str
         assert exceeding_event_str == sender._Sender__get_event()
         assert event_str == sender._Sender__get_event()
 
         # Assert oversized event is omitted
         oversized_event = {'key': ('a' * batch_size)}
-        oversized_event_str = apysdk._json_enc.encode(oversized_event)
+        oversized_event_str = apysdk.json_dumps(oversized_event)
         oversized_event_size = len(oversized_event_str)
         sender._event_queue.put(oversized_event_str)
         sender._event_queue.put(event_str)
@@ -344,8 +344,9 @@ class TestSender(TestCase):
         notify_mock = Mock()
         sender = apysdk._Sender('mockHost', 1234, 10, 100, 100, True, False,
                                 notify_mock)
-        encode = apysdk._json_enc.encode
-        batch = [encode({"event": 1}), encode({"event": 2})]
+        batch = [
+            apysdk.json_dumps({"event": 1}), apysdk.json_dumps({"event": 2})
+        ]
 
         # Assert send batch sends a stringified batch
         sender._send_batch(batch)
@@ -370,16 +371,14 @@ class TestSender(TestCase):
             sender._send_batch(batch)
 
 
-class TestAloomaEncoder(TestCase):
-    def test_convert_types(self):
-        # This test ensures all the types don't throw when converted
-        to_jsonify = {'datetime': datetime.datetime.utcnow(),
-                      'date': datetime.date.today(),
-                      'timedelta': datetime.timedelta(days=1),
-                      'decimal': decimal.Decimal(10),
-                      'int': 1, 'string': 'hello'}
-        encoder = apysdk.AloomaEncoder()
-        encoder.encode(to_jsonify)
+def test_convert_types():
+    # This test ensures all the types don't throw when converted
+    to_jsonify = {'datetime': datetime.datetime.utcnow(),
+                  'date': datetime.date.today(),
+                  'timedelta': datetime.timedelta(days=1),
+                  'decimal': decimal.Decimal(10),
+                  'int': 1, 'string': 'hello'}
+    apysdk.json_dumps(to_jsonify)
 
 
 @patch.object(apysdk, '_Sender')
@@ -406,7 +405,7 @@ def test_terminate():
     for sender_mock in targets.values():
         assert 1 == sender_mock.close.call_count
 
-    assert 0 == len(apysdk._sender_instances)
+    assert not apysdk._sender_instances
 
 
 def set_session_get_json_return_value(session_mock):
