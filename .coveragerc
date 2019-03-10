@@ -1,0 +1,4 @@
+[run]
+omit = 
+    */tests/*
+    */py2to3.py

@@ -63,7 +63,7 @@ class TestPythonSDK(TestCase):
                               sdk.token,
                               consts.DEFAULT_BUFFER_SIZE,
                               consts.DEFAULT_BATCH_INTERVAL,
-                              consts.DEFAULT_BATCH_SIZE, True, True)) == \
+                              consts.DEFAULT_BATCH_SIZE, True, False)) == \
                (next(v for v in passed_to_sender[1].values()),
                 passed_to_sender[0])
 
@@ -176,7 +176,7 @@ class TestSender(TestCase):
         # Test that event is enqueued properly
         notify_mock = Mock()
         sender = apysdk._Sender('mockHost', 1234, 1, 10, 10,
-                                True, False, notify_mock)
+                                True, True, notify_mock)
         some_event = {'event': 1}
         ret = sender.enqueue_event(some_event, False)
         assert ret
@@ -193,7 +193,7 @@ class TestSender(TestCase):
         sender._event_queue.get_nowait()
         assert sender.enqueue_event(some_event, False)
         assert notify_mock.call_args[0] == \
-               (logging.WARNING, consts.LOG_MSG_BUFFER_FREED)
+            (logging.WARNING, consts.LOG_MSG_BUFFER_FREED)
 
     @patch.object(apysdk._Sender, '_verify_connection')
     @patch.object(apysdk._Sender, '_verify_token')
