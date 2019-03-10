@@ -1,29 +1,29 @@
 # -*- coding: utf8 -*-
 # This module contains the Alooma Python SDK, used to report events to the
 # Alooma server
-from __future__ import absolute_import
-
 import datetime
 import decimal
+import functools
 import inspect
 import json
 import logging
+import multiprocessing
 import random
-import requests
 import threading
 import time
 import uuid
 
+import requests
 
 try:
-    from OpenSSL.SSL import SysCallError
+    from OpenSSL import SSL
 
-    broken_pipe_errors = (requests.exceptions.ConnectionError, SysCallError)
+    broken_pipe_errors = (requests.exceptions.ConnectionError, SSL.SysCallError)
+
 except ImportError:
     broken_pipe_errors = (requests.exceptions.ConnectionError,)
 
 from . import consts, pysdk_exceptions as exceptions, py2to3
-
 
 #####################################################
 # We should refrain for adding more dependencies to #
@@ -33,53 +33,29 @@ from . import consts, pysdk_exceptions as exceptions, py2to3
 #####################################################
 
 
-def __get_logger():
-    """
-    If the logger wasn't configured by the calling script, configures the
-    default logger - logs all messages to STDOUT and doesn't propagate to root
-    :return: The 'alooma_pysdk' logger from the built-in library `logging`
-    """
-    logger = logging.getLogger(__name__)
-    if logger.level == logging.NOTSET:
-        handler = logging.StreamHandler()
-        handler.setLevel(0)
-        logger.addHandler(handler)
-        logger.handlers[0].level = logger.level = logging.DEBUG
-        logger.handlers[0].formatter = logging.Formatter(
-            '%(asctime)s [%(levelname)s] {}: %(message)s'.format(__name__),
-            '%Y-%m-%dT%H:%M:%S')
-        logger.propagate = 0
-        logger.info('Using the default logger configuration')
-    return logger
+logger = logging.getLogger(__name__)
+if logger.level == logging.NOTSET:
+    logger.setLevel(logging.WARNING)
 
 
-_logger = __get_logger()
+# Support some additional common Python types
+def _support_additional_types(obj):
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    elif isinstance(obj, datetime.timedelta):
+        return (datetime.datetime.min + obj).time().isoformat()
+    elif isinstance(obj, decimal.Decimal):
+        return str(obj)
+    raise TypeError('Unsupported JSON type: "%s" (%s)' % (obj, type(obj)))
 
 
-# Declare and instantiate an AloomaEncoder
-# This encoder allows JSON encoding of additional types
-class AloomaEncoder(json.JSONEncoder):
-    """
-    Support datetime and decimal encoding when serializing JSONs
-    """
-
-    def default(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.date):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.timedelta):
-            return (datetime.datetime.min + obj).time().isoformat()
-        elif isinstance(obj, decimal.Decimal):
-            return str(obj)
-        else:
-            return super(AloomaEncoder, self).default(obj)
+json_dumps = functools.partial(
+    json.dumps, separators=(',', ':'),
+    default=_support_additional_types
+)
 
 
-_json_enc = AloomaEncoder(separators=(',', ':'))
-
-
-class PythonSDK:
+class PythonSDK(object):
     """
     The Alooma Python SDK is used to report events to the Alooma platform.
     It is comprised of two elements - the PythonSDK class, which stores all
@@ -100,7 +76,7 @@ class PythonSDK:
                  buffer_size=consts.DEFAULT_BUFFER_SIZE, blocking=False,
                  batch_interval=consts.DEFAULT_BATCH_INTERVAL,
                  batch_size=consts.DEFAULT_BATCH_SIZE, use_ssl=True,
-                 *args, **kwargs):
+                 sender_process=False, *args, **kwargs):
         """
         Initializes the Alooma Python SDK, creating a connection to
         the Alooma server
@@ -132,17 +108,19 @@ class PythonSDK:
         :param use_ssl:        (Optional) If True, the SDK will attempt to use
                                an HTTPS connection. Else, a simple HTTP
                                connection will be used. Default is `True`
+        :param sender_process: If True, the sender routine is run on a
+                               subprocess instead of a thread
         """
-        _logger.debug('init. locals=%s' % locals())
+        logger.debug('init. locals=%s' % locals())
 
         if args or kwargs:
-            _logger.warning('The SDK received unrecognized arguments which '
-                            'will be ignored. args: %s, kwargs: %s', args,
-                            kwargs)
+            logger.warning('The SDK received unrecognized arguments which '
+                           'will be ignored. args: %s, kwargs: %s', args,
+                           kwargs)
 
         # _callback is called for every info \ error event. The user can
         # set it via the param callback to get the event messages and send
-        # them elsewhere. If not set, they are logged via the self_logger.
+        # them elsewhere. If not set, they are logged via the selflogger.
         if callback is None:
             self._callback = self._default_callback
         else:
@@ -158,10 +136,10 @@ class PythonSDK:
             errors.append(consts.LOG_MSG_BAD_PARAM_CALLBACK %
                           str(self._callback))
         if not isinstance(servers, py2to3.basestring) and \
-                not isinstance(servers, list):
+            not isinstance(servers, list):
             errors.append(consts.LOG_MSG_BAD_PARAM_SERVERS % servers)
         if event_type and not isinstance(event_type, py2to3.basestring) \
-                and not callable(event_type):
+            and not callable(event_type):
             et_type = type(event_type)
             errors.append(consts.LOG_MSG_BAD_PARAM_EVENT_TYPE %
                           (event_type, et_type))
@@ -185,7 +163,7 @@ class PythonSDK:
         # Get a Sender to get events from the queue and send them.
         # Sender is a Singleton per parameter group
         sender_params = (servers, token, buffer_size, batch_interval,
-                         batch_size, use_ssl)
+                         batch_size, use_ssl, sender_process)
         self._sender = _get_sender(*sender_params, notify_func=self._notify)
 
         self.token = token
@@ -238,7 +216,7 @@ class PythonSDK:
         # Wrap the event with metadata
         event_wrapper[consts.WRAPPER_MESSAGE] = orig_event
 
-        return _json_enc.encode(event_wrapper)
+        return json_dumps(event_wrapper)
 
     def report(self, event, metadata=None, block=None):
         """
@@ -260,7 +238,7 @@ class PythonSDK:
             return False
 
         # Send the event to the queue if it is a dict or a string.
-        if isinstance(event, (dict, ) + py2to3.basestring):
+        if isinstance(event, (dict,) + py2to3.basestring):
             formatted_event = self._format_event(event, metadata)
 
             should_block = block if block is not None else self.is_blocking
@@ -302,11 +280,11 @@ class PythonSDK:
                           `callback` function
         """
         timestamp = datetime.datetime.utcnow()
-        _logger.log(log_level, str(message))
+        logger.log(log_level, str(message))
         try:
             self._callback(log_level, message, timestamp)
         except Exception as ex:
-            _logger.warning(consts.LOG_MSG_CALLBACK_FAILURE % str(ex))
+            logger.warning(consts.LOG_MSG_CALLBACK_FAILURE % str(ex))
 
     @staticmethod
     def _default_callback(msg_type, message, timestamp):
@@ -337,7 +315,7 @@ class PythonSDK:
         return self._sender.servers
 
 
-class _Sender:
+class _Sender(object):
     """
     This class is launched on a new thread as a service.
     It scans the event queue repeatedly and sends events
@@ -345,10 +323,7 @@ class _Sender:
     """
 
     def __init__(self, hosts, token, buffer_size, batch_interval, batch_size,
-                 use_ssl, notify):
-        # This is a concurrent FIFO queue
-        self._event_queue = py2to3.queue.Queue(buffer_size)
-
+                 use_ssl, sender_process, notify):
         # The session on which requests will be sent
         self._session = requests.Session()
 
@@ -366,19 +341,26 @@ class _Sender:
 
         # Set vars
         self._notify = notify
-        self._is_connected = threading.Event()
-        self._is_terminated = threading.Event()
         self._batch_max_size = batch_size
         self._batch_max_interval = batch_interval
         self._exceeding_event = None
+
+        if sender_process:
+            manager = multiprocessing.Manager()
+            self._is_connected = manager.Event()
+            self._is_terminated = manager.Event()
+            self._event_queue = manager.Queue(buffer_size)
+        else:
+            self._is_connected = threading.Event()
+            self._is_terminated = threading.Event()
+            self._event_queue = py2to3.queue.Queue(buffer_size)
+
+        self._start_sender_runner(sender_process)
 
         # Verify connection and token
         self._choose_host()
         self._verify_connection()
         self._verify_token()
-
-        # Start the sender thread
-        self._start_sender_thread()
 
     def _choose_host(self):
         """
@@ -419,9 +401,9 @@ class _Sender:
         """
         try:
             res = self._session.get(self._connection_validation_url, json={})
-            _logger.debug(consts.LOG_MSG_VERIFYING_CONNECTION,
-                          self._connection_validation_url,
-                          res if res else 'No result from backend')
+            logger.debug(consts.LOG_MSG_VERIFYING_CONNECTION,
+                         self._connection_validation_url,
+                         res if res else 'No result from backend')
             if not res.ok:
                 raise requests.exceptions.RequestException(res.content)
             remote_batch_size = res.json().get(consts.MAX_REQUEST_SIZE_FIELD,
@@ -448,12 +430,18 @@ class _Sender:
             raise exceptions.BadToken(consts.LOG_MSG_BAD_TOKEN)
         return True
 
-    def _start_sender_thread(self):
-        """Start the sender thread to initiate messaging"""
-        self._sender_thread = threading.Thread(name='pysdk_sender_thread',
-                                               target=self._sender_main)
-        self._sender_thread.daemon = True
-        self._sender_thread.start()
+    def _start_sender_runner(self, sender_process):
+        if sender_process:
+            runner_class = multiprocessing.Process
+
+        else:
+            runner_class = threading.Thread
+
+        self._sender_runner = runner_class(
+            name='pysdk_sender_process', target=self._sender_main
+        )
+        self._sender_runner.daemon = True
+        self._sender_runner.start()
 
     def _enqueue_batch(self, batch):
         """
@@ -472,12 +460,12 @@ class _Sender:
         """
         try:
             json_batch = '[' + ','.join(batch) + ']'  # Make JSON array string
-            _logger.debug(consts.LOG_MSG_SENDING_BATCH, len(batch),
-                          len(json_batch), self._rest_url)
+            logger.debug(consts.LOG_MSG_SENDING_BATCH, len(batch),
+                         len(json_batch), self._rest_url)
             res = self._session.post(self._rest_url, data=json_batch,
                                      headers=consts.CONTENT_TYPE_JSON)
-            _logger.debug(consts.LOG_MSG_BATCH_SENT_RESULT, res.status_code,
-                          res.content)
+            logger.debug(consts.LOG_MSG_BATCH_SENT_RESULT, res.status_code,
+                         res.content)
             if res.status_code == 400:
                 self._notify(logging.CRITICAL, consts.LOG_MSG_BAD_TOKEN)
                 raise exceptions.BadToken(consts.LOG_MSG_BAD_TOKEN)
@@ -536,10 +524,10 @@ class _Sender:
             self._choose_host()
         last_batch_time = datetime.datetime.utcnow()
 
-        while not (self._is_terminated.isSet() and self._event_queue.empty()):
+        while not (self._is_terminated.is_set() and self._event_queue.empty()):
             batch = None
             try:
-                if not self._is_connected.isSet():
+                if not self._is_connected.is_set():
                     self._verify_connection()
 
                 batch = self._get_batch(last_batch_time)
@@ -558,8 +546,8 @@ class _Sender:
 
                 if batch:  # Failed after pulling a batch from the queue
                     self._enqueue_batch(batch)
-                    _logger.debug(consts.LOG_MSG_ENQUEUED_FAILED_BATCH,
-                                  len(batch))
+                    logger.debug(consts.LOG_MSG_ENQUEUED_FAILED_BATCH,
+                                 len(batch))
 
             else:  # We sent a batch successfully, server is reachable
                 self._is_connected.set()
@@ -627,7 +615,7 @@ class _Sender:
 
     def __flush_and_close_session(self):
         queue_size_before_flush = self._event_queue.qsize()
-        self._sender_thread.join()
+        self._sender_runner.join()
         self._session.close()
         self._notify(logging.INFO,
                      'Terminated the connection to %s after flushing %d '
@@ -639,11 +627,11 @@ class _Sender:
 
     @property
     def is_terminated(self):
-        return self._is_terminated.isSet()
+        return self._is_terminated.is_set()
 
     @property
     def is_connected(self):
-        return self._is_connected.isSet()
+        return self._is_connected.is_set()
 
 
 # Sender instance management

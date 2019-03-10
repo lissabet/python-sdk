@@ -4,13 +4,15 @@ python:
 - 3.4
 - 3.5
 - 3.6
+- 3.7
 # PyPy versions
 - pypy
 - pypy3
 before_install:
 - travis_retry pip install --upgrade pip setuptools  # Upgrade pip and setuptools to get ones with `wheel` support
 install:
-- travis_retry pip install pytest pytest-cov codecov
+- travis_retry pip install -r requirements.txt
+- travis_retry pip install -r requirements-tests.txt
 script:
 - pytest -v --cov=alooma_pysdk
 after_success:
