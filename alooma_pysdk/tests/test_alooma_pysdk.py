@@ -180,7 +180,7 @@ class TestSender(TestCase):
         some_event = {'event': 1}
         ret = sender.enqueue_event(some_event, False)
         assert ret
-        assert sender._event_queue.get_nowait() == some_event
+        assert sender._event_queue.get(timeout=3) == some_event
 
         # Test failing with notification when buffer is full
         sender.enqueue_event(some_event, False)
@@ -190,7 +190,7 @@ class TestSender(TestCase):
         assert sender._notified_buffer_full
 
         # Test recovering when buffer frees up
-        sender._event_queue.get_nowait()
+        sender._event_queue.get(timeout=3)
         assert sender.enqueue_event(some_event, False)
         assert notify_mock.call_args[0] == \
             (logging.WARNING, consts.LOG_MSG_BUFFER_FREED)

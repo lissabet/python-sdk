@@ -164,6 +164,9 @@ class PythonSDK(object):
         # Sender is a Singleton per parameter group
         sender_params = (servers, token, buffer_size, batch_interval,
                          batch_size, use_ssl, sender_process)
+        if sender_process is True and buffer_size > consts.DEFAULT_BUFFER_SIZE:
+            raise ValueError('The max buffer size when using a process-based sender is %s', consts.DEFAULT_BUFFER_SIZE)
+
         self._sender = _get_sender(*sender_params, notify_func=self._notify)
 
         self.token = token
@@ -346,10 +349,9 @@ class _Sender(object):
         self._exceeding_event = None
 
         if sender_process:
-            manager = multiprocessing.Manager()
-            self._is_connected = manager.Event()
-            self._is_terminated = manager.Event()
-            self._event_queue = manager.Queue(buffer_size)
+            self._is_connected = multiprocessing.Event()
+            self._is_terminated = multiprocessing.Event()
+            self._event_queue = multiprocessing.Queue(buffer_size)
         else:
             self._is_connected = threading.Event()
             self._is_terminated = threading.Event()

@@ -54,7 +54,7 @@ BATCH_SIZE_MARGIN = 0.06  # Percent
 DEFAULT_BATCH_INTERVAL = 5  # Seconds
 DEFAULT_BATCH_SIZE = 5000000  # Bytes
 DEFAULT_ALOOMA_ENDPOINT = 'inputs.alooma.com'
-DEFAULT_BUFFER_SIZE = 100000  # Events
+DEFAULT_BUFFER_SIZE = 32767  # Events
 
 # Wrapper field name consts
 WRAPPER_CALLING_FILE = 'calling_file'
